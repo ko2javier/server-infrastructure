@@ -5,6 +5,8 @@
 ![Spring Boot](https://img.shields.io/badge/Spring_Boot-3-6DB33F?logo=springboot&logoColor=white)
 ![Angular](https://img.shields.io/badge/Angular-19-DD0031?logo=angular)
 ![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-15%20passed-brightgreen)
+![Coverage](https://img.shields.io/badge/coverage-50%25-yellow)
 ![License](https://img.shields.io/badge/license-MIT-blue)
 
 Real-time currency exchange and weather dashboard backed by three independently deployable Spring Boot microservices, secured with JWT and a multilevel cache.
@@ -97,6 +99,27 @@ API Service resolves data in four steps: Redis (10 min TTL) → MySQL (< 10 min 
 
 ### 4. Cloudflare Flexible over self-managed certificates
 Adding Let's Encrypt to the VPS is straightforward, but Cloudflare Flexible removes that maintenance entirely and adds DDoS protection and edge caching at no operational cost. The trade-off (HTTP between Cloudflare and Nginx) is acceptable for a non-sensitive public portfolio workload.
+
+---
+
+## Testing
+
+| | |
+|---|---|
+| Framework | JUnit 5 + Mockito |
+| Tests passing | 15 (service layer + controller layer) |
+| Coverage | 50.3% instructions (JaCoCo) |
+
+**What is covered:** `WeatherService`, `CurrencyService`, `WeatherController`, `CurrencyController` — including Redis cache hit, DB cache hit/expired, external API call, stale fallback, and city-not-found (404) paths.
+
+**What is not covered yet:** `WeatherClient`, `CurrencyClient` (external HTTP calls) and `HeaderAuthFilter` / `SecurityConfig` — these require a live MySQL + Redis instance and are the next step via Testcontainers.
+
+**Run tests and generate report:**
+
+```bash
+./gradlew test jacocoTestReport
+# HTML report: build/reports/jacoco/test/html/index.html
+```
 
 ---
 
