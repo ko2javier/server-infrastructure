@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: 'auth-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['auth-service:4000']
+        labels:
+          service: 'auth-service'
+          environment: 'production'
+
+  - job_name: 'api-service'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['api-service:5000']
+        labels:
+          service: 'api-service'
+          environment: 'production'
+
+  - job_name: 'gateway'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['gateway:7000']
+        labels:
+          service: 'gateway'
+          environment: 'production'
+
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
