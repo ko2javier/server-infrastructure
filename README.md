@@ -11,6 +11,8 @@
 
 Real-time currency exchange and weather dashboard backed by three independently deployable Spring Boot microservices, secured with JWT and a multilevel cache.
 
+![KO2 Platform Dashboard](dashboard.png)
+
 ---
 
 ## Architecture Overview
