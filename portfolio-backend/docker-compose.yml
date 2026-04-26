@@ -7,11 +7,6 @@ services:
     env_file:
       - .env
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
   api-service:
     build:
@@ -22,13 +17,7 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      auth-service:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/actuator/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - auth-service
 
   gateway:
     build:
@@ -39,10 +28,8 @@ services:
       - .env
     restart: unless-stopped
     depends_on:
-      auth-service:
-        condition: service_healthy
-      api-service:
-        condition: service_healthy
+      - auth-service
+      - api-service
 
   prometheus:
     image: prom/prometheus:v2.51.2
