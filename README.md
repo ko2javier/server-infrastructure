@@ -100,8 +100,8 @@ Prometheus scrapes `/actuator/prometheus` from all three services every 15 secon
 - Service UP/DOWN status
 
 **Access in production:**
-- Prometheus: `http://167.235.77.17:9090`
-- Grafana: `http://167.235.77.17:3000` (login: `admin`)
+- Prometheus: `http://46.62.206.170:9090`
+- Grafana: `http://46.62.206.170:3000` (login: `admin`)
 
 ---
 
@@ -110,7 +110,7 @@ Prometheus scrapes `/actuator/prometheus` from all three services every 15 secon
 | | URL |
 |---|---|
 | Frontend | [hub.ko2-oreilly.com](https://hub.ko2-oreilly.com) |
-| Swagger UI | [167.235.77.17:7000/webjars/swagger-ui/index.html](http://167.235.77.17:7000/webjars/swagger-ui/index.html) |
+| Swagger UI | [46.62.206.170:7000/webjars/swagger-ui/index.html](http://46.62.206.170:7000/webjars/swagger-ui/index.html) |
 
 **Test credentials:**
 
