@@ -1,4 +1,28 @@
 services:
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: ko2-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_LOG_RETENTION_HOURS: 168
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "localhost:9092", "--list"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+
   auth-service:
     build:
       context: ./auth-currency-data-hub
@@ -30,6 +54,21 @@ services:
     depends_on:
       - auth-service
       - api-service
+
+  ko2-kafka-events:
+    build:
+      context: ./ko2-kafka-events
+    ports:
+      - "6000:6000"
+      - "6001:6001"
+    env_file:
+      - .env
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    restart: unless-stopped
+    depends_on:
+      kafka:
+        condition: service_healthy
 
   prometheus:
     image: prom/prometheus:v2.51.2
@@ -66,5 +105,6 @@ services:
       - prometheus
 
 volumes:
+  kafka_data:
   prometheus_data:
   grafana_data:
