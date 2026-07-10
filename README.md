@@ -106,7 +106,7 @@ Prometheus scrapes `/actuator/prometheus` from all three KO2 services every 15 s
 - JVM heap/threads
 
 **Access in production:**
-- Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `admin`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
+- Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `user` / `user123`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
 - Prometheus: `http://46.62.206.170:9090` (internal use, not exposed via Nginx)
 
 ---
