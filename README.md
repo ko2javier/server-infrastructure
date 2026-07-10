@@ -87,11 +87,11 @@ Spring Cloud Gateway runs on WebFlux (non-blocking). The two downstream services
 
 ## Observability
 
-Prometheus scrapes `/actuator/prometheus` from all three services every 15 seconds. Grafana is auto-provisioned on startup with a pre-built dashboard.
+Prometheus scrapes `/actuator/prometheus` from all three KO2 services every 15 seconds, plus a fourth, independently-deployed sibling project on the same VPS: [`llm-gateway-resilience`](https://github.com/ko2javier/llm-gateway-resilience) (a Groq LLM gateway with Resilience4j, port 8085 — scraped via `host.docker.internal:8085` since it runs as its own standalone container outside this Compose stack). Grafana is auto-provisioned on startup with pre-built dashboards for both.
 
 ![Grafana Dashboard](docs/images/grafana.png)
 
-**Dashboard panels:**
+**KO2 dashboard panels:**
 - HTTP requests/sec per service
 - HTTP latency p95 per service
 - 4xx / 5xx error rate
@@ -99,9 +99,15 @@ Prometheus scrapes `/actuator/prometheus` from all three services every 15 secon
 - JVM live threads
 - Service UP/DOWN status
 
+**LLM Gateway Resilience dashboard panels:**
+- Circuit breaker open/closed state (`groqApi`, `weatherApi`)
+- Retry outcomes
+- HTTP requests/sec and average latency
+- JVM heap/threads
+
 **Access in production:**
-- Prometheus: `http://46.62.206.170:9090`
-- Grafana: `http://46.62.206.170:3000` (login: `admin`)
+- Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `admin`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
+- Prometheus: `http://46.62.206.170:9090` (internal use, not exposed via Nginx)
 
 ---
 
