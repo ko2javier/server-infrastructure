@@ -26,11 +26,17 @@ graph TD
         GW["API Gateway :7000<br/>Spring Cloud Gateway + WebFlux<br/>JWT validation · Redis blacklist · routing"]
         GW -->|"/auth/**"| AUTH["Auth Service :4000<br/>Spring Boot · JWT HS256 · BCrypt · RBAC"]
         GW -->|"/weather/** /currency/**"| API["API Service :5000<br/>Spring Boot · 4-level cache<br/>JUnit 5 · 50% JaCoCo coverage"]
+        AUTH -.->|"user.login"| KFK
+        API -.->|"currency.query · weather.query"| KFK
+        KFK["Kafka :9092 · KRaft mode<br/>no ZooKeeper · 7-day retention"]
+        KFK --> EVT["ko2-kafka-events :6000<br/>audit-group + alert-group consumers"]
         PROM["Prometheus :9090<br/>scrapes /actuator/prometheus"] --> GW
         PROM --> AUTH
         PROM --> API
         GRAF["Grafana :3000<br/>pre-provisioned dashboard"] --> PROM
     end
+
+    EVT --> DB
 
     AUTH --> DB[("MySQL<br/>Aiven Cloud")]
     API --> DB
@@ -57,6 +63,7 @@ graph TD
 | Gateway | Spring Cloud Gateway + WebFlux | Non-blocking reactive I/O; centralises auth so downstream services stay JWT-unaware |
 | Auth Service | Spring Boot 3 · JWT HS256 · BCrypt | Isolated auth boundary; token blacklist in Redis covers logout without server state |
 | API Service | Spring Boot 3 · JPA · RestTemplate | Business logic and cache isolated from auth; independently deployable |
+| Events | Apache Kafka 3.7 (KRaft) | Audit logging off the request path — producers fire-and-forget, the consumer replays from its last offset after a restart. KRaft mode drops the ZooKeeper dependency |
 | Database | MySQL on Aiven | Managed cloud — automatic backups, no DBA overhead for a solo-deployed project |
 | Cache | Redis on Railway | Managed cloud; two distinct concerns: token blacklist (Gateway) and data TTL (API Service) |
 | Observability | Prometheus + Grafana | Production metrics — request rate, p95 latency, JVM heap, error rates per service |
@@ -80,7 +87,13 @@ Request → Redis (10 min TTL) → MySQL (< 10 min old) → External API → sta
 ```
 The stale fallback prevents hard 503s when upstream APIs (Open-Meteo, ExchangeRate) are temporarily unavailable. Redis handles hot sub-millisecond reads; MySQL provides persistence across Redis restarts.
 
-### 4. Reactive gateway, blocking services
+### 4. Audit events over Kafka instead of synchronous calls
+
+Auth and API publish audit events (`user.login`, `currency.query`, `weather.query`) to Kafka and forget about them. `ko2-kafka-events` consumes with two independent groups — `audit-group` persists to `audit_events`, `alert-group` watches for rate-limit conditions and writes `alert_events`.
+
+Nothing on the request path waits for audit logging, and the consumer can be down or redeployed without losing events: Kafka replays from the last committed offset. The broker runs in **KRaft mode**, so there is no ZooKeeper to operate, with a 7-day retention and a healthcheck the consumer waits on before starting.
+
+### 5. Reactive gateway, blocking services
 Spring Cloud Gateway runs on WebFlux (non-blocking). The two downstream services run on WebMVC (blocking/thread-per-request). This is intentional: the Gateway's job is routing at high concurrency — WebFlux fits. The business logic services are I/O-bound with simple CRUD; WebMVC is simpler to test and reason about.
 
 ---
@@ -104,6 +117,8 @@ Prometheus scrapes `/actuator/prometheus` from all three KO2 services every 15 s
 - Retry outcomes
 - HTTP requests/sec and average latency
 - JVM heap/threads
+
+**Not scraped yet:** `ko2-kafka-events` exposes `/actuator/prometheus` on its management port `:6001`, but there is no scrape job for it in `prometheus.yml`. Adding one is the next step — consumer lag and events processed per topic are the panels worth having.
 
 **Access in production:**
 - Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `user` / `user123`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
@@ -154,6 +169,7 @@ Prometheus scrapes `/actuator/prometheus` from all three KO2 services every 15 s
 | [auth-currency-data-hub](https://github.com/ko2javier/auth-currency-data-hub) | Auth Service :4000 — login, logout, JWT issuance, RBAC (USER / ADMIN / SUPERADMIN) |
 | [currency-data-hub](https://github.com/ko2javier/currency-data-hub) | API Service :5000 — weather + currency endpoints, 4-level cache, 15 tests |
 | [api-gateway-currency-data-hub](https://github.com/ko2javier/api-gateway-currency-data-hub) | Gateway :7000 — reactive routing, JWT validation, Redis blacklist |
+| [ko2-kafka-events](https://github.com/ko2javier/ko2-kafka-events) | Events :6000 — Kafka consumers for audit and rate-limit alerting |
 
 ---
 
@@ -207,7 +223,7 @@ Each microservice repo has its own GitHub Actions workflow. On push to `master`:
 2. `git pull` in the service subdir
 3. `docker-compose rm -f <service>` + `docker-compose up --build -d <service>`
 
-Prometheus and Grafana are started once with `docker-compose up -d prometheus grafana` and persist via named volumes (`prometheus_data`, `grafana_data`).
+Prometheus, Grafana and the Kafka broker are started once with `docker-compose up -d prometheus grafana kafka` and persist via named volumes (`prometheus_data`, `grafana_data`, `kafka_data`). `ko2-kafka-events` waits on the broker's healthcheck before starting, so the broker must be up first.
 
 ---
 
