@@ -27,6 +27,14 @@ scrape_configs:
           service: 'gateway'
           environment: 'production'
 
+  - job_name: 'ko2-kafka-events'
+    metrics_path: '/actuator/prometheus'
+    static_configs:
+      - targets: ['ko2-kafka-events:6001']
+        labels:
+          service: 'ko2-kafka-events'
+          environment: 'production'
+
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']

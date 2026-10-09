@@ -34,13 +34,16 @@ graph TD
         PROM --> AUTH
         PROM --> API
         GRAF["Grafana :3000<br/>pre-provisioned dashboard"] --> PROM
+        PROM --> EVT
+        RD[("Redis :6379<br/>self-hosted container<br/>AOF · 128 MB cap")]
     end
 
     EVT --> DB
 
     AUTH --> DB[("MySQL<br/>Aiven Cloud")]
     API --> DB
-    API --> RD[("Redis<br/>Railway Cloud")]
+    AUTH --> RD
+    API --> RD
     GW --> RD
     API -->|"cache miss"| ER["open.er-api.com"]
     API -->|"cache miss"| OM["Open-Meteo API"]
@@ -65,7 +68,7 @@ graph TD
 | API Service | Spring Boot 3 · JPA · RestTemplate | Business logic and cache isolated from auth; independently deployable |
 | Events | Apache Kafka 3.7 (KRaft) | Audit logging off the request path — producers fire-and-forget, the consumer replays from its last offset after a restart. KRaft mode drops the ZooKeeper dependency |
 | Database | MySQL on Aiven | Managed cloud — automatic backups, no DBA overhead for a solo-deployed project |
-| Cache | Redis on Railway | Managed cloud; two distinct concerns: token blacklist (Gateway) and data TTL (API Service) |
+| Cache | Redis 7.2 — self-hosted container | Two distinct concerns: token blacklist (Gateway + Auth) and data TTL (API Service). Moved off managed hosting in October 2026: it sits on the same Compose network as its only three clients, so it needs no public port, and both workloads are TTL-bound — nothing in it is worth paying to have replicated |
 | Observability | Prometheus + Grafana | Production metrics — request rate, p95 latency, JVM heap, error rates per service |
 | Infrastructure | Hetzner VPS CX23 | Best cost/performance ratio in Europe for this workload |
 | Deployment | Docker Compose + GitHub Actions | Right-sized for three services on one host; push to `master` → auto-deploy |
@@ -100,7 +103,7 @@ Spring Cloud Gateway runs on WebFlux (non-blocking). The two downstream services
 
 ## Observability
 
-Prometheus scrapes `/actuator/prometheus` from all three KO2 services every 15 seconds, plus a fourth, independently-deployed sibling project on the same VPS: [`llm-gateway-resilience`](https://github.com/ko2javier/llm-gateway-resilience) (a Groq LLM gateway with Resilience4j, port 8085 — scraped via `host.docker.internal:8085` since it runs as its own standalone container outside this Compose stack). Grafana is auto-provisioned on startup with pre-built dashboards for both.
+Prometheus scrapes `/actuator/prometheus` from all four KO2 services every 15 seconds — the three on the request path plus `ko2-kafka-events`, which exposes it on its own management port `:6001` — and from an independently-deployed sibling project on the same VPS: [`llm-gateway-resilience`](https://github.com/ko2javier/llm-gateway-resilience) (a Groq LLM gateway with Resilience4j, port 8085 — scraped via `host.docker.internal:8085` since it runs as its own standalone container outside this Compose stack). Grafana is auto-provisioned on startup with pre-built dashboards for both.
 
 ![Grafana Dashboard](docs/images/grafana.png)
 
@@ -118,7 +121,7 @@ Prometheus scrapes `/actuator/prometheus` from all three KO2 services every 15 s
 - HTTP requests/sec and average latency
 - JVM heap/threads
 
-**Not scraped yet:** `ko2-kafka-events` exposes `/actuator/prometheus` on its management port `:6001`, but there is no scrape job for it in `prometheus.yml`. Adding one is the next step — consumer lag and events processed per topic are the panels worth having.
+**Scraped but not yet charted:** `ko2-kafka-events` has had a scrape job since October 2026, so its consumer metrics are in Prometheus — but the Grafana dashboard has no panels for them yet. The two worth adding are **consumer lag** (`kafka_consumer_fetch_manager_records_lag`: how far behind the audit consumer is running) and events processed per topic. Until they exist, a consumer that dies still goes unnoticed on the dashboard, even though the data is now being collected.
 
 **Access in production:**
 - Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `user` / `user123`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
@@ -189,7 +192,8 @@ JWT_SECRET=your_256bit_secret
 DB_URL=jdbc:mysql://your-mysql-host:3306/ko2db
 DB_USERNAME=your_user
 DB_PASSWORD=your_password
-REDIS_URL=redis://:password@host:port
+REDIS_PASSWORD=your_redis_password
+REDIS_URL=redis://default:your_redis_password@redis:6379
 AUTH_SERVICE_URL=http://auth-service:4000
 API_SERVICE_URL=http://api-service:5000
 GATEWAY_URL=http://localhost:7000
