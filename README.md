@@ -121,7 +121,7 @@ Prometheus scrapes `/actuator/prometheus` from all four KO2 services every 15 se
 - HTTP requests/sec and average latency
 - JVM heap/threads
 
-**Scraped but not yet charted:** `ko2-kafka-events` has had a scrape job since October 2026, so its consumer metrics are in Prometheus — but the Grafana dashboard has no panels for them yet. The two worth adding are **consumer lag** (`kafka_consumer_fetch_manager_records_lag`: how far behind the audit consumer is running) and events processed per topic. Until they exist, a consumer that dies still goes unnoticed on the dashboard, even though the data is now being collected.
+**Scraped, but consumer lag is still missing.** `ko2-kafka-events` has had a scrape job since October 2026, and it does export `spring_kafka_listener_seconds_*` — how long the listener takes to handle a message. That is not lag. The Kafka **client** metrics, including `kafka_consumer_fetch_manager_records_lag`, are absent because `KafkaConfig` builds its own `DefaultKafkaConsumerFactory`: Spring Boot attaches a `MicrometerConsumerListener` only to the factory it auto-configures, so a hand-rolled one reports nothing. Adding that listener is a one-line change in the service, and it has to come before any Grafana panel — the metric does not exist yet. Until then, a consumer that dies or falls behind goes unnoticed.
 
 **Access in production:**
 - Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `user` / `user123`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
