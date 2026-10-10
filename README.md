@@ -71,7 +71,7 @@ graph TD
 | Cache | Redis 7.2 — self-hosted container | Two distinct concerns: token blacklist (Gateway + Auth) and data TTL (API Service). Moved off managed hosting in October 2026: it sits on the same Compose network as its only three clients, so it needs no public port, and both workloads are TTL-bound — nothing in it is worth paying to have replicated |
 | Observability | Prometheus + Grafana | Production metrics — request rate, p95 latency, JVM heap, error rates per service |
 | Infrastructure | Hetzner VPS CX23 | Best cost/performance ratio in Europe for this workload |
-| Deployment | Docker Compose + GitHub Actions | Right-sized for three services on one host; push to `master` → auto-deploy |
+| Deployment | Docker Compose + GitHub Actions | Right-sized for four services on one host; push to a repo's main branch → auto-deploy |
 | SSL | Cloudflare Flexible | Edge TLS termination + DDoS protection at zero operational cost |
 
 ---
@@ -221,13 +221,20 @@ docker compose up -d
 
 ## CI/CD
 
-Each microservice repo has its own GitHub Actions workflow. On push to `master`:
+Each microservice repo has its own GitHub Actions workflow. On push to its main branch — `master` for the three request-path services, `main` for `ko2-kafka-events`:
 
-1. SSH into Hetzner VPS
+1. SSH into the Hetzner VPS (`script_stop: true`, so the first failing command ends the job)
 2. `git pull` in the service subdir
-3. `docker-compose rm -f <service>` + `docker-compose up --build -d <service>`
+3. `docker compose build <service>`
+4. `docker compose up -d --no-deps <service>`
 
-Prometheus, Grafana and the Kafka broker are started once with `docker-compose up -d prometheus grafana kafka` and persist via named volumes (`prometheus_data`, `grafana_data`, `kafka_data`). `ko2-kafka-events` waits on the broker's healthcheck before starting, so the broker must be up first.
+**Build first, replace second.** The original script ran `stop` and `rm -f` before building, so a failed build left the service down instead of leaving the previous one serving. `--no-deps` keeps a service deploy from touching `redis` or `kafka`, which belong to this repo rather than to the service being deployed.
+
+The workflows call `docker compose` (v2). The VPS also has the abandoned v1 at `/usr/bin/docker-compose`, which crashes with `KeyError: 'ContainerConfig'` when recreating a container whose image was built by a modern Docker — the fault that silently broke every KO2 Hub deploy between May and October 2026. A shim at `/usr/local/bin/docker-compose` forwards any remaining v1 call to v2.
+
+Prometheus, Grafana and the Kafka broker are started once with `docker compose up -d prometheus grafana kafka redis` and persist via named volumes (`prometheus_data`, `grafana_data`, `kafka_data`, `redis_data`). `ko2-kafka-events` waits on the broker's healthcheck before starting, so the broker must be up first.
+
+**`prometheus.yml` is bind-mounted as a single file**, so it is bound to an inode. `git pull` replaces the file rather than editing it, which leaves the running container reading the old one — and `POST /-/reload` then returns 200 after reloading stale config. Changing it requires `docker compose up -d --force-recreate prometheus`, not a reload.
 
 ---
 
