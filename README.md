@@ -121,7 +121,7 @@ Prometheus scrapes `/actuator/prometheus` from all four KO2 services every 15 se
 - HTTP requests/sec and average latency
 - JVM heap/threads
 
-**Scraped, but consumer lag is still missing.** `ko2-kafka-events` has had a scrape job since October 2026, and it does export `spring_kafka_listener_seconds_*` — how long the listener takes to handle a message. That is not lag. The Kafka **client** metrics, including `kafka_consumer_fetch_manager_records_lag`, are absent because `KafkaConfig` builds its own `DefaultKafkaConsumerFactory`: Spring Boot attaches a `MicrometerConsumerListener` only to the factory it auto-configures, so a hand-rolled one reports nothing. Adding that listener is a one-line change in the service, and it has to come before any Grafana panel — the metric does not exist yet. Until then, a consumer that dies or falls behind goes unnoticed.
+**Consumer lag is exported since October 2026.** `ko2-kafka-events` had a scrape job and exported `spring_kafka_listener_seconds_*` — how long the listener takes to handle a message, which is not lag. The Kafka **client** metrics were absent because `KafkaConfig` builds its own `DefaultKafkaConsumerFactory` and Spring Boot attaches a `MicrometerConsumerListener` only to the factory it auto-configures. The listener is now wired by hand, and a test in that repo fails if it is removed. The series to alert on is **`kafka_consumer_fetch_manager_records_lag_max`**: the per-partition `..._records_lag` only appears once lagging partitions are assigned, while `_max` exists from the client's first fetch. A Grafana panel for it is still to be built.
 
 **Access in production:**
 - Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `user` / `user123`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
@@ -221,14 +221,17 @@ docker compose up -d
 
 ## CI/CD
 
-Each microservice repo has its own GitHub Actions workflow. On push to its main branch — `master` for the three request-path services, `main` for `ko2-kafka-events`:
+Each microservice repo has its own GitHub Actions workflow. On push to its main branch — `master` for the three request-path services, `main` for `ko2-kafka-events` — all four run the same three gated stages:
 
-1. SSH into the Hetzner VPS (`script_stop: true`, so the first failing command ends the job)
-2. `git pull` in the service subdir
-3. `docker compose build <service>`
-4. `docker compose up -d --no-deps <service>`
+1. **tests** — JUnit 5 + Testcontainers against real dependencies (MySQL and Redis for the request-path services; MySQL and a real Kafka broker for the consumer). A red test stops everything below.
+2. **build-and-push** — the image is built in Actions and pushed to `ghcr.io`, tagged both `latest` and the commit SHA.
+3. **deploy** — SSH into the VPS (`script_stop: true`, so the first failing command ends the job), `git pull` *this* repo for the Compose file, then `<SERVICE>_TAG=<sha> docker compose pull && up -d --no-deps <service>`, and wait for a `200` from the service's actuator before reporting success.
 
-**Build first, replace second.** The original script ran `stop` and `rm -f` before building, so a failed build left the service down instead of leaving the previous one serving. `--no-deps` keeps a service deploy from touching `redis` or `kafka`, which belong to this repo rather than to the service being deployed.
+**The images are built in Actions, not on the VPS.** Until October 2026 every push ran `docker compose build` inside the server: a `gradle bootJar` there took three and a half minutes and competed for the RAM that is this machine's real limit, and a failed build left the repo already pulled to the new commit with the old container still serving. Deploys now pin the commit SHA instead of `latest`, so the running container states which code it serves and a rollback is the same command with the previous SHA. Each service reads its own tag variable — `AUTH_TAG`, `API_TAG`, `GATEWAY_TAG`, `KAFKA_EVENTS_TAG` — defaulting to `latest`, and each Compose service keeps its `build:` block as a fallback for bringing it up by hand.
+
+`--no-deps` keeps a service deploy from touching `redis` or `kafka`, which belong to this repo rather than to the service being deployed.
+
+**Application ports are published on `127.0.0.1` only** (`4000`, `5000`, `6000`, `6001`, `7000`). Services reach each other over the Compose network by name, Prometheus scrapes them the same way, and the only thing that needs them on the host is the deploy health check. From outside, the entry point is nginx.
 
 The workflows call `docker compose` (v2). The VPS also has the abandoned v1 at `/usr/bin/docker-compose`, which crashes with `KeyError: 'ContainerConfig'` when recreating a container whose image was built by a modern Docker — the fault that silently broke every KO2 Hub deploy between May and October 2026. A shim at `/usr/local/bin/docker-compose` forwards any remaining v1 call to v2.
 

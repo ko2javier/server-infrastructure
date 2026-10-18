@@ -129,11 +129,27 @@ services:
         condition: service_healthy
 
   ko2-kafka-events:
+    # Desde el 2026-10-18 la imagen la construye GitHub Actions y se baja de
+    # ghcr.io (ver el servicio gateway, mas arriba, para el porque).
+    # KAFKA_EVENTS_TAG lo pone el workflow con el SHA del commit; sin el, se
+    # usa latest. Antes de esto el contenedor corria una imagen SIN ETIQUETA
+    # del 10/10 y nadie podia decir que codigo estaba sirviendo.
+    image: ghcr.io/ko2javier/ko2-kafka-events:${KAFKA_EVENTS_TAG:-latest}
+    # El build se queda como respaldo, no como camino normal: mientras esten
+    # los dos, `docker compose build ko2-kafka-events` sigue funcionando.
     build:
       context: ./ko2-kafka-events
+    # Solo en 127.0.0.1, NO en todas las interfaces (2026-10-18). Hasta ese dia
+    # los dos puertos se publicaban en 0.0.0.0 y respondian desde Internet, y
+    # aqui eso pesa mas que en los demas servicios: JwtAuthenticationFilter se
+    # fia de las cabeceras X-User-Name y X-User-Roles sin validar ningun token,
+    # porque asume que al 6000 solo llega el gateway. El gateway llega por la
+    # red interna de Docker (por nombre), y Prometheus raspa el 6001 por la
+    # misma red; en el host solo lo necesita el health check del workflow de
+    # despliegue (curl a 127.0.0.1:6001).
     ports:
-      - "6000:6000"
-      - "6001:6001"
+      - "127.0.0.1:6000:6000"
+      - "127.0.0.1:6001:6001"
     env_file:
       - .env
     environment:
