@@ -47,6 +47,12 @@ services:
       retries: 5
 
   auth-service:
+    # Desde el 2026-10-18 la imagen la construye GitHub Actions y se baja de
+    # ghcr.io (ver el servicio gateway, mas abajo, para el porque). AUTH_TAG lo
+    # pone el workflow con el SHA del commit; sin el, se usa latest.
+    image: ghcr.io/ko2javier/auth-currency-data-hub:${AUTH_TAG:-latest}
+    # El build se queda como respaldo, no como camino normal: mientras esten
+    # los dos, `docker compose build auth-service` sigue funcionando.
     build:
       context: ./auth-currency-data-hub
     ports:
@@ -59,6 +65,12 @@ services:
         condition: service_healthy
 
   api-service:
+    # Desde el 2026-10-18 la imagen la construye GitHub Actions y se baja de
+    # ghcr.io (ver el servicio gateway, mas abajo, para el porque). API_TAG lo
+    # pone el workflow con el SHA del commit; sin el, se usa latest.
+    image: ghcr.io/ko2javier/currency-data-hub:${API_TAG:-latest}
+    # El build se queda como respaldo, no como camino normal: mientras esten
+    # los dos, `docker compose build api-service` sigue funcionando.
     build:
       context: ./currency-data-hub
     ports:
