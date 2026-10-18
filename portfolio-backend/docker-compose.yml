@@ -73,6 +73,18 @@ services:
         condition: service_healthy
 
   gateway:
+    # Desde el 2026-10-18 la imagen la construye GitHub Actions y se baja de
+    # ghcr.io, en vez de compilarla aqui: un `gradle bootJar` dentro del VPS
+    # tardaba tres minutos y medio y se comia la RAM, que es el limite de esta
+    # maquina. GATEWAY_TAG lo pone el workflow con el SHA del commit, asi que
+    # el contenedor dice exactamente que codigo corre y volver atras es
+    # repetir el despliegue con el SHA anterior.
+    image: ghcr.io/ko2javier/api-gateway-currency-data-hub:${GATEWAY_TAG:-latest}
+    # El build se queda como respaldo, NO como el camino normal. Mientras
+    # esten los dos, `docker compose build gateway` sigue funcionando y
+    # etiqueta el resultado con el nombre de arriba, asi que el servicio se
+    # puede levantar aqui si ghcr.io no responde. Quitarlo es seguro una vez
+    # que el despliegue por imagen lleve un tiempo rodando.
     build:
       context: ./api-gateway-currency-data-hub
     ports:
