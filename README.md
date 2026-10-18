@@ -134,7 +134,7 @@ Prometheus scrapes `/actuator/prometheus` from all four KO2 services every 15 se
 | | URL |
 |---|---|
 | Frontend | [hub.ko2-oreilly.com](https://hub.ko2-oreilly.com) |
-| Swagger UI | [46.62.206.170:7000/webjars/swagger-ui/index.html](http://46.62.206.170:7000/webjars/swagger-ui/index.html) |
+| Swagger UI | [api.ko2-oreilly.com/webjars/swagger-ui](https://api.ko2-oreilly.com/webjars/swagger-ui/index.html) |
 
 **Test credentials:**
 

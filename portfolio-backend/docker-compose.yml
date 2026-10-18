@@ -55,8 +55,13 @@ services:
     # los dos, `docker compose build auth-service` sigue funcionando.
     build:
       context: ./auth-currency-data-hub
+    # Solo en 127.0.0.1, NO en todas las interfaces (2026-10-18). Hasta ese dia
+    # el puerto se publicaba en 0.0.0.0 y respondia desde Internet. Los demas
+    # servicios llegan a este por la red interna de Docker (por nombre), asi
+    # que no lo necesitan en el host; lo que si lo necesita esta en el propio
+    # servidor: el health check del workflow de despliegue (curl a 127.0.0.1).
     ports:
-      - "4000:4000"
+      - "127.0.0.1:4000:4000"
     env_file:
       - .env
     restart: unless-stopped
@@ -73,8 +78,13 @@ services:
     # los dos, `docker compose build api-service` sigue funcionando.
     build:
       context: ./currency-data-hub
+    # Solo en 127.0.0.1, NO en todas las interfaces (2026-10-18). Hasta ese dia
+    # el puerto se publicaba en 0.0.0.0 y respondia desde Internet. Los demas
+    # servicios llegan a este por la red interna de Docker (por nombre), asi
+    # que no lo necesitan en el host; lo que si lo necesita esta en el propio
+    # servidor: el health check del workflow de despliegue (curl a 127.0.0.1).
     ports:
-      - "5000:5000"
+      - "127.0.0.1:5000:5000"
     env_file:
       - .env
     restart: unless-stopped
@@ -99,8 +109,14 @@ services:
     # que el despliegue por imagen lleve un tiempo rodando.
     build:
       context: ./api-gateway-currency-data-hub
+    # Solo en 127.0.0.1, NO en todas las interfaces (2026-10-18). Hasta ese dia
+    # el puerto se publicaba en 0.0.0.0 y respondia desde Internet. Los demas
+    # servicios llegan a este por la red interna de Docker (por nombre), asi
+    # que no lo necesitan en el host; lo que si lo necesita esta en el propio
+    # servidor: el health check del workflow de despliegue (curl a 127.0.0.1) y nginx,
+    # que hace proxy_pass a localhost:7000. Desde fuera se entra SOLO por nginx.
     ports:
-      - "7000:7000"
+      - "127.0.0.1:7000:7000"
     env_file:
       - .env
     restart: unless-stopped
