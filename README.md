@@ -103,7 +103,7 @@ Spring Cloud Gateway runs on WebFlux (non-blocking). The two downstream services
 
 ## Observability
 
-Prometheus scrapes `/actuator/prometheus` from all four KO2 services every 15 seconds — the three on the request path plus `ko2-kafka-events`, which exposes it on its own management port `:6001` — and from an independently-deployed sibling project on the same VPS: [`llm-gateway-resilience`](https://github.com/ko2javier/llm-gateway-resilience) (a Groq LLM gateway with Resilience4j, port 8085 — scraped via `host.docker.internal:8085` since it runs as its own standalone container outside this Compose stack). Grafana is auto-provisioned on startup with pre-built dashboards for both.
+Prometheus scrapes `/actuator/prometheus` from all four KO2 services every 15 seconds — the three on the request path plus `ko2-kafka-events`, which exposes it on its own management port `:6001` — and from an independently-deployed sibling project on the same VPS: [`llm-gateway-resilience`](https://github.com/ko2javier/llm-gateway-resilience) (a Groq LLM gateway with Resilience4j, port 8085 — it runs as its own standalone container outside this Compose stack, attached to the Compose network so Prometheus can scrape it by container name). Grafana is auto-provisioned on startup with pre-built dashboards for both.
 
 ![Grafana Dashboard](docs/images/grafana.png)
 
@@ -125,7 +125,7 @@ Prometheus scrapes `/actuator/prometheus` from all four KO2 services every 15 se
 
 **Access in production:**
 - Grafana: [api.ko2-oreilly.com/grafana](https://api.ko2-oreilly.com/grafana/) (login: `user` / `user123`) — served over HTTPS as a subpath of the Gateway's own domain, no separate subdomain needed
-- Prometheus: `http://46.62.206.170:9090` (internal use, not exposed via Nginx)
+- Prometheus: not published. It listens on the server's loopback interface only, so the UI is reached over an SSH tunnel when needed; Grafana queries it over the Compose network. Every service in the stack is bound the same way: Nginx and Cloudflare are the only way in from outside.
 
 ---
 
