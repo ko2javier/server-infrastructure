@@ -42,7 +42,12 @@ scrape_configs:
   - job_name: 'llm-gateway'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['host.docker.internal:8085']
+      # Por el nombre del contenedor en la red de compose, como los demas jobs
+      # (2026-10-25). Antes era host.docker.internal:8085, que resolvia a la IP
+      # del puente docker0: dejo de funcionar al publicar ese contenedor solo en
+      # 127.0.0.1. El contenedor llm-gateway no lo levanta este compose, asi que
+      # esta unido a la red a mano (docker network connect).
+      - targets: ['llm-gateway:8085']
         labels:
           service: 'llm-gateway'
           environment: 'production'
