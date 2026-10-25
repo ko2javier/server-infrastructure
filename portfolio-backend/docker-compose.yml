@@ -161,8 +161,11 @@ services:
 
   prometheus:
     image: prom/prometheus:v2.51.2
+    # Solo en 127.0.0.1, como el resto de servicios (2026-10-25). La UI no
+    # necesita estar publicada: Grafana consulta a Prometheus por la red interna
+    # de Docker, y para mirarla a mano basta un tunel SSH al propio servidor.
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -181,8 +184,11 @@ services:
 
   grafana:
     image: grafana/grafana:10.4.2
+    # Solo en 127.0.0.1, como el resto de servicios (2026-10-25). El camino de
+    # entrada es nginx, en api.ko2-oreilly.com/grafana/ (GF_SERVER_ROOT_URL de
+    # aqui abajo), que es el que pasa por Cloudflare y por TLS.
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
